@@ -1,8 +1,9 @@
 import Food from "../models/foodModel.js";
 import fs from "fs";
+import path from "path";
 
 /** POST /api/food/add
- * Body: multipart/form-data with fields: name, description, price, category, image (file)
+ * Body: JSON with fields: name, description, price, category, image (URL string)
  */
 
 const addFood = async (req, res) => {
@@ -22,7 +23,7 @@ const addFood = async (req, res) => {
       description,
       price: Number(price),
       category,
-      image, // ✅ Directly save URL
+      image,
     });
 
     await food.save();
@@ -36,10 +37,6 @@ const addFood = async (req, res) => {
     });
   }
 };
-
-
-
-
 
 // all food list
 const listFood = async (req, res) => {
@@ -61,28 +58,24 @@ const removeFood = async (req, res) => {
       return res.json({ success: false, message: "Food item not found" });
     }
 
-    // Use a more reliable path and add a callback to handle errors
-   // ✅ Only delete file if it's NOT a URL
-if (food.image && !food.image.startsWith("http")) {
-  const imagePath = `uploads/${food.image}`;
-  fs.unlink(imagePath, (err) => {
-    if (err) console.error("Error deleting file:", err);
-  });
-}
-
- else {
-  console.log("Skipping image delete (URL image).");
-}
-
+    // Only delete file if it's a local file path (NOT a URL)
+    if (food.image && !food.image.startsWith("http")) {
+      const imagePath = path.join(process.cwd(), "uploads", food.image);
+      fs.unlink(imagePath, (err) => {
+        if (err) console.error("Error deleting file:", err);
+      });
+    } else {
+      console.log("Skipping image delete (URL image).");
+    }
 
     await Food.findByIdAndDelete(req.body.id);
     res.json({ success: true, message: "Food Removed" });
   } catch (error) {
-    // Log the error for better debugging on the server side
     console.error("Error in removeFood:", error);
     res.json({ success: false, message: "Error" });
   }
 };
+
 // update food item
 const updateFood = async (req, res) => {
   try {
@@ -97,7 +90,7 @@ const updateFood = async (req, res) => {
     if (description) food.description = description;
     if (price) food.price = Number(price);
     if (category) food.category = category;
-    if (image) food.image = image; // ✅ update image URL
+    if (image) food.image = image;
 
     await food.save();
     res.json({ success: true, message: "Food updated successfully", data: food });
@@ -111,6 +104,4 @@ const updateFood = async (req, res) => {
   }
 };
 
-
-
-export { addFood, listFood, removeFood, updateFood};
+export { addFood, listFood, removeFood, updateFood };

@@ -1,12 +1,15 @@
 import express from "express";
 import restaurantModel from "../models/restaurantModel.js";
+import adminAuthMiddleware from "../middleware/adminAuth.js";
 
 const router = express.Router();
 
+// All restaurant admin routes require admin authentication
+
 // Add restaurant
-router.post("/add", async (req, res) => {
+router.post("/add", adminAuthMiddleware, async (req, res) => {
   try {
-    console.log("Received restaurant:", req.body); // ✅ add this
+    console.log("Received restaurant:", req.body);
     const restaurant = new restaurantModel(req.body);
     await restaurant.save();
     res.json({ success: true, message: "Restaurant Added" });
@@ -16,9 +19,8 @@ router.post("/add", async (req, res) => {
   }
 });
 
-
 // Get all restaurants (admin)
-router.get("/list", async (req, res) => {
+router.get("/list", adminAuthMiddleware, async (req, res) => {
   try {
     const restaurants = await restaurantModel.find();
     res.json({ success: true, data: restaurants });
@@ -28,7 +30,7 @@ router.get("/list", async (req, res) => {
 });
 
 // Delete restaurant
-router.delete("/delete/:id", async (req, res) => {
+router.delete("/delete/:id", adminAuthMiddleware, async (req, res) => {
   try {
     await restaurantModel.findByIdAndDelete(req.params.id);
     res.json({ success: true, message: "Restaurant deleted" });
@@ -37,7 +39,8 @@ router.delete("/delete/:id", async (req, res) => {
   }
 });
 
-router.put("/update/:id", async (req, res) => {
+// Update restaurant
+router.put("/update/:id", adminAuthMiddleware, async (req, res) => {
   try {
     const updated = await restaurantModel.findByIdAndUpdate(
       req.params.id,
@@ -52,6 +55,4 @@ router.put("/update/:id", async (req, res) => {
   }
 });
 
-
 export default router;
-

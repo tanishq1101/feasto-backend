@@ -3,6 +3,12 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import validator from "validator";
 
+// Validate critical environment variables at module load
+if (!process.env.JWT_SECRET) {
+  console.error("FATAL: JWT_SECRET environment variable is not set!");
+  process.exit(1);
+}
+
 // Create JWT token with expiry
 const createToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "7d" });
@@ -80,4 +86,30 @@ const verifyUser = (req, res) => {
   }
 };
 
-export { loginUser, registerUser, verifyUser };
+// ---------- ADMIN LOGIN ----------
+const adminLogin = async (req, res) => {
+  const { email, password } = req.body;
+  try {
+    const user = await userModel.findOne({ email });
+    if (!user) {
+      return res.json({ success: false, message: "User doesn't exist" });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.json({ success: false, message: "Invalid credentials" });
+    }
+
+    if (!user.isAdmin) {
+      return res.status(403).json({ success: false, message: "Not authorized as admin" });
+    }
+
+    const token = createToken(user._id);
+    res.json({ success: true, token });
+  } catch (error) {
+    console.error("Admin login error:", error.message);
+    res.json({ success: false, message: "Error during admin login" });
+  }
+};
+
+export { loginUser, registerUser, verifyUser, adminLogin };

@@ -37,6 +37,27 @@ export const getRestaurantDetails = async (req, res) => {
 // ✅ Admin listing
 export const listRestaurants = async (req, res) => {
   try {
+    const page = Math.max(parseInt(req.query.page ?? "1", 10), 1);
+    const limit = Math.max(parseInt(req.query.limit ?? "0", 10), 0);
+
+    if (limit > 0) {
+      const skip = (page - 1) * limit;
+      const [restaurants, total] = await Promise.all([
+        restaurantModel.find().skip(skip).limit(limit),
+        restaurantModel.countDocuments(),
+      ]);
+      return res.json({
+        success: true,
+        data: restaurants,
+        meta: {
+          page,
+          limit,
+          total,
+          hasNextPage: skip + restaurants.length < total,
+        },
+      });
+    }
+
     const restaurants = await restaurantModel.find();
     res.json({ success: true, data: restaurants });
   } catch (error) {

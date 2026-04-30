@@ -55,9 +55,22 @@ const createCheckoutSession = async (req, res) => {
 const saveOrderAfterPayment = async (req, res) => {
   try {
     const { session_id } = req.query;
-    if (!session_id) return res.json({ success: false });
+    if (!session_id) return res.json({ success: false, message: "No session ID provided" });
 
+    // Verify the Stripe session is actually paid
     const session = await stripe.checkout.sessions.retrieve(session_id);
+
+    if (session.payment_status !== "paid") {
+      return res.json({ success: false, message: "Payment not completed" });
+    }
+
+    // Prevent duplicate orders: check if an order with this session_id already exists
+    const existingOrder = await orderModel.findOne({ stripeSessionId: session_id });
+    if (existingOrder) {
+      // Order already saved — return success without creating a duplicate
+      return res.json({ success: true, order: existingOrder, message: "Order already saved" });
+    }
+
     const userId = session.metadata.userId;
     const address = JSON.parse(session.metadata.address);
     const amount = session.amount_total / 100;
@@ -77,6 +90,7 @@ const saveOrderAfterPayment = async (req, res) => {
       address,
       payment: true,
       status: "Order Placed",
+      stripeSessionId: session_id,
     });
 
     await userModel.findByIdAndUpdate(userId, { cartData: {} });
@@ -84,8 +98,8 @@ const saveOrderAfterPayment = async (req, res) => {
     return res.json({ success: true, order: newOrder });
 
   } catch (error) {
-    console.log(error);
-    return res.json({ success: false });
+    console.log("Save order error:", error);
+    return res.json({ success: false, message: "Failed to save order" });
   }
 };
 
@@ -211,6 +225,11 @@ const deleteOrder = async (req, res) => {
     const order = await orderModel.findById(orderId);
     if (!order) {
       return res.status(404).json({ success: false, message: "Order not found" });
+    }
+
+    // Ensure users can only delete their own orders
+    if (order.userId !== userId) {
+      return res.status(403).json({ success: false, message: "Not authorized to delete this order" });
     }
 
     await orderModel.findByIdAndDelete(orderId);

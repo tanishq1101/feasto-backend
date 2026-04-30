@@ -20,13 +20,15 @@ const app = express();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// CORS (frontend URL)
+// Build allowed origins from environment
+const allowedOrigins = [
+  process.env.FRONTEND_URL_PROD,
+  process.env.ADMIN_URL_PROD,
+].filter(Boolean);
+
 app.use(
   cors({
-      origin: [
-      "https://fooddel-frontend-xv4i.vercel.app",
-      "https://foodel-admin-9n9z.vercel.app"
-    ],
+    origin: allowedOrigins,
     credentials: true,
   })
 );

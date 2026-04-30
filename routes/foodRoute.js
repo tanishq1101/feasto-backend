@@ -2,15 +2,19 @@ import express from "express";
 import {
   addFood,
   listFood,
-  removeFood, updateFood
+  removeFood,
+  updateFood,
 } from "../controllers/foodController.js";
-import { upload } from "../middleware/uploadMiddleware.js";
+import adminAuthMiddleware from "../middleware/adminAuth.js";
 
 const router = express.Router();
 
-router.post("/add", addFood);
+// Public: anyone can view the food list
 router.get("/list", listFood);
-router.post("/remove", removeFood);
-router.post("/update", updateFood);
+
+// Admin-only: add, remove, update food items
+router.post("/add", adminAuthMiddleware, addFood);
+router.post("/remove", adminAuthMiddleware, removeFood);
+router.post("/update", adminAuthMiddleware, updateFood);
 
 export default router;
