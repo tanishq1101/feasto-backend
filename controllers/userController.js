@@ -1,115 +1,90 @@
-import userModel from "../models/userModel.js";
-import jwt from "jsonwebtoken";
-import bcrypt from "bcrypt";
-import validator from "validator";
+import { prisma } from "../config/prisma.js";
 
-// Validate critical environment variables at module load
-if (!process.env.JWT_SECRET) {
-  console.error("FATAL: JWT_SECRET environment variable is not set!");
-  process.exit(1);
-}
-
-// Create JWT token with expiry
-const createToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "7d" });
-};
-
-// ---------- LOGIN ----------
-const loginUser = async (req, res) => {
-  const { email, password } = req.body;
+// Sync Clerk user into the Postgres DB (upsert on first API call)
+const syncUser = async (req, res) => {
   try {
-    const user = await userModel.findOne({ email });
-    if (!user) {
-      return res.json({ success: false, message: "User doesn't exist" });
+    const { id, email, name } = req.body;
+    if (!id || !email) {
+      return res.status(400).json({ success: false, message: "Missing user data" });
     }
 
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.json({ success: false, message: "Invalid credentials" });
-    }
+    const user = await prisma.user.upsert({
+      where: { id },
+      update: { email, name: name || null },
+      create: { id, email, name: name || null },
+    });
 
-    const token = createToken(user._id);
-    res.json({ success: true, token });
+    return res.json({ success: true, user });
   } catch (error) {
-    console.error("Login error:", error.message);
-    res.json({ success: false, message: "Error during login" });
+    console.error("Sync user error:", error.message);
+    return res.status(500).json({ success: false, message: "Error syncing user" });
   }
 };
 
-// ---------- REGISTER ----------
-const registerUser = async (req, res) => {
-  const { name, password, email } = req.body;
+// Verify that the Clerk token is valid (middleware handles actual verification)
+// Just confirms the user exists in our DB
+const verifyUser = async (req, res) => {
   try {
-    const exists = await userModel.findOne({ email });
-    if (exists) {
-      return res.json({ success: false, message: "User already exists" });
+    const clerkUserId = req.auth?.userId;
+    if (!clerkUserId) {
+      return res.status(401).json({ success: false, message: "No auth context" });
     }
 
-    if (!validator.isEmail(email)) {
-      return res.json({ success: false, message: "Please enter a valid email" });
-    }
+    // Auto-upsert: ensure user exists in DB even if sync wasn't explicitly called
+    const user = await prisma.user.upsert({
+      where: { id: clerkUserId },
+      update: {},
+      create: {
+        id: clerkUserId,
+        email: req.auth.sessionClaims?.email ?? "",
+        name: req.auth.sessionClaims?.name ?? null,
+      },
+    });
 
-    if (password.length < 8) {
-      return res.json({ success: false, message: "Please enter a stronger password (min 8 chars)" });
-    }
-
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    const newUser = new userModel({ name, email, password: hashedPassword });
-    const user = await newUser.save();
-
-    const token = createToken(user._id);
-    res.json({ success: true, token });
-  } catch (error) {
-    console.error("Register error:", error.message);
-    res.json({ success: false, message: "Error during registration" });
-  }
-};
-
-// ---------- VERIFY TOKEN ----------
-const verifyUser = (req, res) => {
-  try {
-    const authHeader = req.headers.authorization;
-
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ success: false, message: "No token provided" });
-    }
-
-    const token = authHeader.split(" ")[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-    return res.json({ success: true, userId: decoded.id });
+    return res.json({ success: true, userId: user.id, isAdmin: user.isAdmin });
   } catch (err) {
-    console.error("Token verification error:", err.message);
-    return res.status(401).json({ success: false, message: "Invalid or expired token" });
+    console.error("Verify user error:", err.message);
+    return res.status(500).json({ success: false, message: "Error verifying user" });
   }
 };
 
-// ---------- ADMIN LOGIN ----------
-const adminLogin = async (req, res) => {
-  const { email, password } = req.body;
+// Check whether the currently signed-in Clerk user is an admin
+const checkAdmin = async (req, res) => {
   try {
-    const user = await userModel.findOne({ email });
-    if (!user) {
-      return res.json({ success: false, message: "User doesn't exist" });
+    const clerkUserId = req.auth?.userId;
+    if (!clerkUserId) {
+      return res.status(401).json({ success: false, message: "Not authenticated" });
     }
 
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.json({ success: false, message: "Invalid credentials" });
+    const user = await prisma.user.findUnique({ where: { id: clerkUserId } });
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
     }
 
     if (!user.isAdmin) {
-      return res.status(403).json({ success: false, message: "Not authorized as admin" });
+      return res.status(403).json({ success: false, message: "Not an admin" });
     }
 
-    const token = createToken(user._id);
-    res.json({ success: true, token });
+    return res.json({ success: true, message: "Admin verified" });
   } catch (error) {
-    console.error("Admin login error:", error.message);
-    res.json({ success: false, message: "Error during admin login" });
+    console.error("Check admin error:", error.message);
+    return res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
-export { loginUser, registerUser, verifyUser, adminLogin };
+// Grant admin privileges to a user (for initial admin setup)
+const makeAdmin = async (req, res) => {
+  try {
+    const { userId } = req.body;
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: { isAdmin: true },
+    });
+    return res.json({ success: true, user });
+  } catch (error) {
+    console.error("Make admin error:", error.message);
+    return res.status(500).json({ success: false, message: "Error granting admin" });
+  }
+};
+
+export { syncUser, verifyUser, checkAdmin, makeAdmin };

@@ -1,6 +1,10 @@
-import jwt from "jsonwebtoken";
-import userModel from "../models/userModel.js";
+import { clerkClient } from "@clerk/express";
+import { prisma } from "../config/prisma.js";
 
+/**
+ * Auth middleware using Clerk.
+ * Verifies the Bearer token from Clerk, then upserts the user in Postgres.
+ */
 const authMiddleware = async (req, res, next) => {
   const authHeader = req.headers.authorization;
 
@@ -9,24 +13,34 @@ const authMiddleware = async (req, res, next) => {
   }
 
   const token = authHeader.split(" ")[1];
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    // fetch user from DB to get isAdmin and optionally other details
-    const user = await userModel.findById(decoded.id).select("-password");
-    if (!user) return res.status(401).json({ success: false, message: "User not found" });
 
-    // attach full user object or minimal fields
+  try {
+    // Verify Clerk session token
+    const payload = await clerkClient.verifyToken(token);
+    const clerkUserId = payload.sub;
+
+    // Upsert user in Postgres (auto-sync on every auth'd request)
+    const user = await prisma.user.upsert({
+      where: { id: clerkUserId },
+      update: {},
+      create: {
+        id: clerkUserId,
+        email: payload.email ?? "",
+        name: payload.name ?? null,
+      },
+    });
+
     req.user = {
-      id: user._id.toString(),
-      isAdmin: !!user.isAdmin,
+      id: user.id,
+      isAdmin: user.isAdmin,
       name: user.name,
       email: user.email,
     };
 
     next();
   } catch (err) {
-    console.error("Auth middleware error:", err);
-    return res.status(401).json({ success: false, message: "Invalid token" });
+    console.error("Auth middleware error:", err.message);
+    return res.status(401).json({ success: false, message: "Invalid or expired token" });
   }
 };
 

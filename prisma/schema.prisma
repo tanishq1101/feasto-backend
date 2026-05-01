@@ -1,0 +1,55 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id // Clerk user ID (sub)
+  email     String   @unique
+  name      String?
+  isAdmin   Boolean  @default(false)
+  cartData  Json     @default("{}")
+  createdAt DateTime @default(now())
+  orders    Order[]
+}
+
+model Food {
+  id          String   @id @default(cuid())
+  name        String
+  description String
+  price       Float
+  image       String?
+  category    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Restaurant {
+  id        String   @id @default(cuid())
+  name      String
+  city      String
+  address   String
+  cuisine   String
+  rating    Float
+  image     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Order {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  items           Json
+  amount          Float
+  address         Json
+  status          String   @default("Food Processing")
+  payment         Boolean  @default(false)
+  stripeSessionId String?  @unique
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}

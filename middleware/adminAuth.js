@@ -1,10 +1,9 @@
-import jwt from "jsonwebtoken";
-import userModel from "../models/userModel.js";
+import { clerkClient } from "@clerk/express";
+import { prisma } from "../config/prisma.js";
 
 /**
- * Admin authentication middleware.
- * Verifies JWT token AND checks that the user has isAdmin: true.
- * Must be placed after body parsing middleware in the Express chain.
+ * Admin auth middleware using Clerk.
+ * Verifies the Clerk token AND checks isAdmin === true in Postgres.
  */
 const adminAuthMiddleware = async (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -14,12 +13,17 @@ const adminAuthMiddleware = async (req, res, next) => {
   }
 
   const token = authHeader.split(" ")[1];
+
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await userModel.findById(decoded.id).select("-password");
+    // Verify Clerk session token
+    const payload = await clerkClient.verifyToken(token);
+    const clerkUserId = payload.sub;
+
+    // Find user in Postgres
+    const user = await prisma.user.findUnique({ where: { id: clerkUserId } });
 
     if (!user) {
-      return res.status(401).json({ success: false, message: "User not found" });
+      return res.status(401).json({ success: false, message: "User not found in database" });
     }
 
     if (!user.isAdmin) {
@@ -27,7 +31,7 @@ const adminAuthMiddleware = async (req, res, next) => {
     }
 
     req.user = {
-      id: user._id.toString(),
+      id: user.id,
       isAdmin: true,
       name: user.name,
       email: user.email,
