@@ -104,3 +104,26 @@ export const deleteRestaurant = async (req, res) => {
     res.json({ success: false, message: "Failed to delete restaurant" });
   }
 };
+
+// Admin: Update restaurant
+export const updateRestaurant = async (req, res) => {
+  try {
+    const { name, city, address, cuisine, rating, image } = req.body;
+    const restaurant = await prisma.restaurant.update({
+      where: { id: req.params.id },
+      data: {
+        ...(name && { name }),
+        ...(city && { city }),
+        ...(address && { address }),
+        ...(cuisine && { cuisine }),
+        ...(rating !== undefined && { rating: Number(rating) }),
+        ...(image !== undefined && { image: image || null }),
+      },
+    });
+
+    res.json({ success: true, message: "Restaurant Updated", restaurant });
+  } catch (err) {
+    console.error("updateRestaurant error:", err);
+    res.json({ success: false, message: "Failed to update restaurant" });
+  }
+};

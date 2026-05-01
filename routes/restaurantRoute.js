@@ -1,6 +1,6 @@
 import express from "express";
 import { getRestaurantsByCity, getMenuByRestaurant, getRestaurantDetails} from "../controllers/restaurantController.js";
-import restaurantModel from "../models/restaurantModel.js";
+import { prisma } from "../config/prisma.js";
 
 const router = express.Router();
 
@@ -20,8 +20,8 @@ router.get("/all", async (req, res) => {
     if (limit > 0) {
       const skip = (page - 1) * limit;
       const [restaurants, total] = await Promise.all([
-        restaurantModel.find().skip(skip).limit(limit),
-        restaurantModel.countDocuments(),
+        prisma.restaurant.findMany({ skip, take: limit, orderBy: { createdAt: "desc" } }),
+        prisma.restaurant.count(),
       ]);
       return res.json({
         success: true,
@@ -35,10 +35,11 @@ router.get("/all", async (req, res) => {
       });
     }
 
-    const restaurants = await restaurantModel.find();
+    const restaurants = await prisma.restaurant.findMany({ orderBy: { createdAt: "desc" } });
     res.json({ success: true, restaurants });
-  } catch {
-    res.json({ success: false });
+  } catch (error) {
+    console.error("list all restaurants error:", error);
+    res.json({ success: false, message: "Error loading restaurants" });
   }
 });
 
