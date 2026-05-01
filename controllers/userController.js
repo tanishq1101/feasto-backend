@@ -1,4 +1,5 @@
 import { prisma } from "../config/prisma.js";
+import jwt from "jsonwebtoken";
 
 // Sync Clerk user into the Postgres DB (upsert on first API call)
 const syncUser = async (req, res) => {
@@ -88,4 +89,31 @@ const makeAdmin = async (req, res) => {
   }
 };
 
-export { syncUser, verifyUser, checkAdmin, makeAdmin };
+const adminLogin = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const adminEmail = process.env.ADMIN_EMAIL || "admin@feasto.com";
+    const adminPassword = process.env.ADMIN_PASSWORD || "admin123";
+
+    if (!email || !password) {
+      return res.status(400).json({ success: false, message: "Email and password are required" });
+    }
+
+    if (email !== adminEmail || password !== adminPassword) {
+      return res.status(401).json({ success: false, message: "Invalid admin credentials" });
+    }
+
+    const token = jwt.sign(
+      { role: "admin", email: adminEmail, name: "Admin" },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    return res.json({ success: true, token });
+  } catch (error) {
+    console.error("Admin login error:", error.message);
+    return res.status(500).json({ success: false, message: "Failed to login admin" });
+  }
+};
+
+export { syncUser, verifyUser, checkAdmin, makeAdmin, adminLogin };

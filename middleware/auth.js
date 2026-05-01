@@ -1,5 +1,5 @@
-import { clerkClient } from "@clerk/express";
 import { prisma } from "../config/prisma.js";
+import { verifyClerkToken } from "./verifyClerkToken.js";
 
 /**
  * Auth middleware using Clerk.
@@ -16,7 +16,7 @@ const authMiddleware = async (req, res, next) => {
 
   try {
     // Verify Clerk session token
-    const payload = await clerkClient.verifyToken(token);
+    const payload = await verifyClerkToken(token);
     const clerkUserId = payload.sub;
 
     // Upsert user in Postgres (auto-sync on every auth'd request)

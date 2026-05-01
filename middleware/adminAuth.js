@@ -1,5 +1,6 @@
-import { clerkClient } from "@clerk/express";
+import jwt from "jsonwebtoken";
 import { prisma } from "../config/prisma.js";
+import { verifyClerkToken } from "./verifyClerkToken.js";
 
 /**
  * Admin auth middleware using Clerk.
@@ -15,18 +16,28 @@ const adminAuthMiddleware = async (req, res, next) => {
   const token = authHeader.split(" ")[1];
 
   try {
-    // Verify Clerk session token
-    const payload = await clerkClient.verifyToken(token);
-    const clerkUserId = payload.sub;
-
-    // Find user in Postgres
-    const user = await prisma.user.findUnique({ where: { id: clerkUserId } });
-
-    if (!user) {
-      return res.status(401).json({ success: false, message: "User not found in database" });
+    // First, accept backend-issued admin JWTs (used by admin panel login without Clerk).
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      if (decoded?.role === "admin") {
+        req.user = {
+          id: decoded.id || "admin-local",
+          isAdmin: true,
+          name: decoded.name || "Admin",
+          email: decoded.email || null,
+        };
+        return next();
+      }
+    } catch {
+      // Not a backend JWT; continue with Clerk verification fallback.
     }
 
-    if (!user.isAdmin) {
+    // Clerk fallback for existing admin users with isAdmin=true in DB.
+    const payload = await verifyClerkToken(token);
+    const clerkUserId = payload.sub;
+    const user = await prisma.user.findUnique({ where: { id: clerkUserId } });
+
+    if (!user || !user.isAdmin) {
       return res.status(403).json({ success: false, message: "Admin access required" });
     }
 
@@ -36,8 +47,7 @@ const adminAuthMiddleware = async (req, res, next) => {
       name: user.name,
       email: user.email,
     };
-
-    next();
+    return next();
   } catch (err) {
     console.error("Admin auth error:", err.message);
     return res.status(401).json({ success: false, message: "Invalid or expired token" });
