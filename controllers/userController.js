@@ -25,19 +25,20 @@ const syncUser = async (req, res) => {
 // Just confirms the user exists in our DB
 const verifyUser = async (req, res) => {
   try {
-    const clerkUserId = req.auth?.userId;
+    const clerkUserId = req.user?.id;
     if (!clerkUserId) {
       return res.status(401).json({ success: false, message: "No auth context" });
     }
 
-    // Auto-upsert: ensure user exists in DB even if sync wasn't explicitly called
+    // Auto-upsert: ensure user exists in DB even if sync wasn't explicitly called.
+    // authMiddleware already verifies Clerk token and stores normalized user info at req.user.
     const user = await prisma.user.upsert({
       where: { id: clerkUserId },
       update: {},
       create: {
         id: clerkUserId,
-        email: req.auth.sessionClaims?.email ?? "",
-        name: req.auth.sessionClaims?.name ?? null,
+        email: req.user?.email ?? "",
+        name: req.user?.name ?? null,
       },
     });
 
@@ -51,7 +52,7 @@ const verifyUser = async (req, res) => {
 // Check whether the currently signed-in Clerk user is an admin
 const checkAdmin = async (req, res) => {
   try {
-    const clerkUserId = req.auth?.userId;
+    const clerkUserId = req.user?.id;
     if (!clerkUserId) {
       return res.status(401).json({ success: false, message: "Not authenticated" });
     }

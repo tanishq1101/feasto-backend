@@ -13,6 +13,7 @@ import cartRouter from "./routes/cartRoute.js";
 import orderRouter from "./routes/orderRoute.js";
 import restaurantAdminRouter from "./routes/restaurantAdminRoute.js";
 import restaurantRouter from "./routes/restaurantRoute.js";
+import { corsOptions } from "./config/cors.js";
 
 const app = express();
 const port = process.env.PORT || 4000;
@@ -21,20 +22,7 @@ const port = process.env.PORT || 4000;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Build allowed origins from environment + defaults for local dev
-const allowedOrigins = [
-  process.env.FRONTEND_URL_LOCAL || "http://localhost:5173",
-  "http://localhost:5174",
-  process.env.FRONTEND_URL_PROD,
-  process.env.ADMIN_URL_PROD,
-].filter(Boolean); // remove undefined entries
-
-app.use(
-  cors({
-    origin: allowedOrigins,
-    credentials: true,
-  })
-);
+app.use(cors(corsOptions));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
