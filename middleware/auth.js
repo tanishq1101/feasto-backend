@@ -1,5 +1,10 @@
 import { prisma } from "../config/prisma.js";
 import { verifyClerkToken } from "./verifyClerkToken.js";
+import {
+  fallbackClerkEmail,
+  getClerkPayloadEmail,
+  getClerkPayloadName,
+} from "../utils/clerkUser.js";
 
 /**
  * Auth middleware using Clerk.
@@ -18,15 +23,20 @@ const authMiddleware = async (req, res, next) => {
     // Verify Clerk session token
     const payload = await verifyClerkToken(token);
     const clerkUserId = payload.sub;
+    const payloadEmail = getClerkPayloadEmail(payload);
+    const name = getClerkPayloadName(payload);
 
     // Upsert user in Postgres (auto-sync on every auth'd request)
     const user = await prisma.user.upsert({
       where: { id: clerkUserId },
-      update: {},
+      update: {
+        ...(payloadEmail ? { email: payloadEmail } : {}),
+        ...(name ? { name } : {}),
+      },
       create: {
         id: clerkUserId,
-        email: payload.email ?? "",
-        name: payload.name ?? null,
+        email: payloadEmail ?? fallbackClerkEmail(clerkUserId),
+        name,
       },
     });
 

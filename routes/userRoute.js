@@ -5,7 +5,7 @@ import authMiddleware from "../middleware/auth.js";
 const userRouter = express.Router();
 
 // Sync a Clerk user into Postgres (called after Clerk sign-in on the frontend)
-userRouter.post("/sync", syncUser);
+userRouter.post("/sync", authMiddleware, syncUser);
 
 // Verify the current token and return user info (Clerk JWT required)
 userRouter.get("/verify", authMiddleware, verifyUser);

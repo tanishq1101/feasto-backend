@@ -1,18 +1,30 @@
 import { prisma } from "../config/prisma.js";
 import jwt from "jsonwebtoken";
+import { fallbackClerkEmail, normalizeClerkEmail } from "../utils/clerkUser.js";
 
 // Sync Clerk user into the Postgres DB (upsert on first API call)
 const syncUser = async (req, res) => {
   try {
+    const clerkUserId = req.user?.id;
     const { id, email, name } = req.body;
-    if (!id || !email) {
-      return res.status(400).json({ success: false, message: "Missing user data" });
+
+    if (!clerkUserId || (id && id !== clerkUserId)) {
+      return res.status(403).json({ success: false, message: "User mismatch" });
     }
 
+    const normalizedEmail =
+      normalizeClerkEmail(email) ??
+      normalizeClerkEmail(req.user?.email) ??
+      fallbackClerkEmail(clerkUserId);
+
     const user = await prisma.user.upsert({
-      where: { id },
-      update: { email, name: name || null },
-      create: { id, email, name: name || null },
+      where: { id: clerkUserId },
+      update: { email: normalizedEmail, name: name || req.user?.name || null },
+      create: {
+        id: clerkUserId,
+        email: normalizedEmail,
+        name: name || req.user?.name || null,
+      },
     });
 
     return res.json({ success: true, user });
@@ -38,7 +50,7 @@ const verifyUser = async (req, res) => {
       update: {},
       create: {
         id: clerkUserId,
-        email: req.user?.email ?? "",
+        email: req.user?.email ?? fallbackClerkEmail(clerkUserId),
         name: req.user?.name ?? null,
       },
     });
