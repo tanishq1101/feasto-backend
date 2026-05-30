@@ -1,10 +1,12 @@
-import dotenv from "dotenv";
-dotenv.config();
-
-import express from "express";
-import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
+import dotenv from "dotenv";
+import express from "express";
+import cors from "cors";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.join(__dirname, ".env") });
 
 import { connectDB } from "./config/db.js";
 import foodRouter from "./routes/foodRoute.js";
@@ -17,10 +19,6 @@ import { corsOptions } from "./config/cors.js";
 
 const app = express();
 const port = process.env.PORT || 4000;
-
-// Resolve __dirname for ES Modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 app.use(cors(corsOptions));
 
