@@ -131,4 +131,48 @@ const adminLogin = async (req, res) => {
   }
 };
 
-export { syncUser, verifyUser, checkAdmin, makeAdmin, adminLogin };
+// Get all users in the system (Admin only)
+const listUsers = async (req, res) => {
+  try {
+    const users = await prisma.user.findMany({
+      orderBy: { createdAt: "desc" },
+    });
+    return res.json({ success: true, data: users });
+  } catch (error) {
+    console.error("listUsers error:", error.message);
+    return res.status(500).json({ success: false, message: "Error fetching user list" });
+  }
+};
+
+// Toggle Admin privileges for a user (Admin only)
+const toggleUserAdmin = async (req, res) => {
+  try {
+    const { userId } = req.body;
+    const currentAdminId = req.user.id;
+
+    if (userId === currentAdminId) {
+      return res.status(400).json({ success: false, message: "You cannot change your own role." });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: { isAdmin: !user.isAdmin },
+    });
+
+    return res.json({
+      success: true,
+      message: `User role updated successfully to ${updatedUser.isAdmin ? "Admin" : "User"}`,
+      data: updatedUser,
+    });
+  } catch (error) {
+    console.error("toggleUserAdmin error:", error.message);
+    return res.status(500).json({ success: false, message: "Error updating user role" });
+  }
+};
+
+export { syncUser, verifyUser, checkAdmin, makeAdmin, adminLogin, listUsers, toggleUserAdmin };

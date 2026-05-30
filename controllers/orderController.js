@@ -15,12 +15,22 @@ const createCheckoutSession = async (req, res) => {
 
     const line_items = items.map((item) => ({
       price_data: {
-        currency: "usd",
+        currency: "inr",
         product_data: { name: item.name },
-        unit_amount: item.price * 100,
+        unit_amount: Math.round(item.price * 100),
       },
       quantity: item.quantity,
     }));
+
+    // Add Delivery Fee as a separate line item (40 INR = 4000 paise)
+    line_items.push({
+      price_data: {
+        currency: "inr",
+        product_data: { name: "Delivery Fee" },
+        unit_amount: 40 * 100,
+      },
+      quantity: 1,
+    });
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],

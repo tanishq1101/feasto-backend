@@ -65,4 +65,28 @@ const getCart = async (req, res) => {
   }
 };
 
-export { addToCart, removeFromCart, getCart };
+// Clear item from cart entirely
+const clearFromCart = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { itemId } = req.body;
+
+    const userData = await prisma.user.findUnique({ where: { id: userId } });
+    const cartData = { ...(userData?.cartData ?? {}) };
+
+    delete cartData[itemId];
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { cartData },
+    });
+
+    res.json({ success: true, message: "Cleared From Cart", cartData });
+  } catch (error) {
+    console.error("clearFromCart error:", error);
+    res.json({ success: false, message: "Error clearing item from cart" });
+  }
+};
+
+export { addToCart, removeFromCart, getCart, clearFromCart };
+

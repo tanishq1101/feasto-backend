@@ -1,6 +1,7 @@
 import express from "express";
-import { syncUser, verifyUser, checkAdmin, makeAdmin, adminLogin } from "../controllers/userController.js";
+import { syncUser, verifyUser, checkAdmin, makeAdmin, adminLogin, listUsers, toggleUserAdmin } from "../controllers/userController.js";
 import authMiddleware from "../middleware/auth.js";
+import adminAuthMiddleware from "../middleware/adminAuth.js";
 
 const userRouter = express.Router();
 
@@ -18,5 +19,9 @@ userRouter.post("/make-admin", makeAdmin);
 
 // Admin login (temporary non-Clerk flow for admin panel)
 userRouter.post("/admin/login", adminLogin);
+
+// Admin-only user management routes
+userRouter.get("/list", adminAuthMiddleware, listUsers);
+userRouter.post("/toggle-admin", adminAuthMiddleware, toggleUserAdmin);
 
 export default userRouter;
