@@ -4,14 +4,7 @@ import Stripe from "stripe";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-const isDeployedRuntime =
-  process.env.NODE_ENV === "production" || process.env.RENDER || process.env.VERCEL;
-
-const FRONTEND_URL =
-  (isDeployedRuntime
-    ? process.env.FRONTEND_URL_PROD || process.env.FRONTEND_URL_LOCAL
-    : process.env.FRONTEND_URL_LOCAL || process.env.FRONTEND_URL_PROD) ||
-  "http://localhost:5173";
+const FRONTEND_URL = process.env.FRONTEND_URL_LOCAL || "http://localhost:5173";
 
 // -------------------- CREATE STRIPE CHECKOUT --------------------
 

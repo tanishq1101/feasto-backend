@@ -1,7 +1,6 @@
 const envOriginList = [
   process.env.FRONTEND_URL_LOCAL,
-  process.env.FRONTEND_URL_PROD,
-  process.env.ADMIN_URL_PROD,
+  process.env.ADMIN_URL_LOCAL,
   ...(process.env.CORS_ALLOWED_ORIGINS || "")
     .split(",")
     .map((value) => value.trim())

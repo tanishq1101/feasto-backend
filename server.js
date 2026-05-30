@@ -46,7 +46,7 @@ app.get("/", (req, res) => {
   res.send("Local Backend Server Running on http://localhost:4000");
 });
 
-// Enable local server (NOT for Vercel)
+// Enable local server
 app.listen(port, () => {
   console.log(`🚀 Local backend running at http://localhost:${port}`);
 });

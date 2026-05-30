@@ -42,7 +42,7 @@ app.use("/api/admin/restaurants", restaurantAdminRouter);
 
 // Health check
 app.get("/", (req, res) => {
-  res.send("Backend running on Vercel Serverless!");
+  res.send("Backend running locally!");
 });
 
 // ⚠️ Do NOT use app.listen(). Export instead
