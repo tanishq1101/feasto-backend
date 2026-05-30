@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken";
 import { prisma } from "../config/prisma.js";
 import { verifyClerkToken } from "./verifyClerkToken.js";
+import { getClerkPayloadEmail, getClerkPayloadName } from "../utils/clerkUser.js";
 
 /**
  * Admin auth middleware using Clerk.
@@ -35,7 +36,26 @@ const adminAuthMiddleware = async (req, res, next) => {
     // Clerk fallback for existing admin users with isAdmin=true in DB.
     const payload = await verifyClerkToken(token);
     const clerkUserId = payload.sub;
-    const user = await prisma.user.findUnique({ where: { id: clerkUserId } });
+    const payloadEmail = getClerkPayloadEmail(payload);
+    const name = getClerkPayloadName(payload);
+
+    const adminEmail = process.env.ADMIN_EMAIL || "admin@feasto.com";
+
+    let user;
+    if (payloadEmail && payloadEmail.toLowerCase() === adminEmail.toLowerCase()) {
+      user = await prisma.user.upsert({
+        where: { id: clerkUserId },
+        update: { isAdmin: true, name: name || undefined },
+        create: {
+          id: clerkUserId,
+          email: payloadEmail,
+          name,
+          isAdmin: true,
+        },
+      });
+    } else {
+      user = await prisma.user.findUnique({ where: { id: clerkUserId } });
+    }
 
     if (!user || !user.isAdmin) {
       return res.status(403).json({ success: false, message: "Admin access required" });
