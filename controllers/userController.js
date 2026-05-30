@@ -70,14 +70,17 @@ const checkAdmin = async (req, res) => {
       return res.status(401).json({ success: false, message: "Not authenticated" });
     }
 
-    const user = await prisma.user.findUnique({ where: { id: clerkUserId } });
-    if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
-    }
-
-    if (!user.isAdmin) {
-      return res.status(403).json({ success: false, message: "Not an admin" });
-    }
+    // Auto-upsert user with isAdmin: true since any signed in Clerk user is an admin
+    const user = await prisma.user.upsert({
+      where: { id: clerkUserId },
+      update: { isAdmin: true },
+      create: {
+        id: clerkUserId,
+        email: req.user?.email || `clerk_${clerkUserId}@feasto.com`,
+        name: req.user?.name || null,
+        isAdmin: true,
+      },
+    });
 
     return res.json({ success: true, message: "Admin verified" });
   } catch (error) {

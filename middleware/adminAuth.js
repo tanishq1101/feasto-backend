@@ -33,33 +33,23 @@ const adminAuthMiddleware = async (req, res, next) => {
       // Not a backend JWT; continue with Clerk verification fallback.
     }
 
-    // Clerk fallback for existing admin users with isAdmin=true in DB.
+    // Clerk fallback for any signed-in user - they are all admins now!
     const payload = await verifyClerkToken(token);
     const clerkUserId = payload.sub;
     const payloadEmail = getClerkPayloadEmail(payload);
     const name = getClerkPayloadName(payload);
 
-    const adminEmail = process.env.ADMIN_EMAIL || "admin@feasto.com";
-
-    let user;
-    if (payloadEmail && payloadEmail.toLowerCase() === adminEmail.toLowerCase()) {
-      user = await prisma.user.upsert({
-        where: { id: clerkUserId },
-        update: { isAdmin: true, name: name || undefined },
-        create: {
-          id: clerkUserId,
-          email: payloadEmail,
-          name,
-          isAdmin: true,
-        },
-      });
-    } else {
-      user = await prisma.user.findUnique({ where: { id: clerkUserId } });
-    }
-
-    if (!user || !user.isAdmin) {
-      return res.status(403).json({ success: false, message: "Admin access required" });
-    }
+    // Upsert user in database ensuring they exist and are flagged as admin
+    const user = await prisma.user.upsert({
+      where: { id: clerkUserId },
+      update: { isAdmin: true, name: name || undefined },
+      create: {
+        id: clerkUserId,
+        email: payloadEmail || `clerk_${clerkUserId}@feasto.com`,
+        name,
+        isAdmin: true,
+      },
+    });
 
     req.user = {
       id: user.id,

@@ -1,17 +1,13 @@
 import express from "express";
-import { getRestaurantsByCity, getMenuByRestaurant, getRestaurantDetails} from "../controllers/restaurantController.js";
+import { getRestaurantsByCity, getMenuByRestaurant, getRestaurantDetails } from "../controllers/restaurantController.js";
 import { prisma } from "../config/prisma.js";
 
 const router = express.Router();
 
-// /api/restaurant/city/Delhi
-router.get("/city/:city", getRestaurantsByCity);
+// ⚠️ IMPORTANT: Specific routes MUST be defined BEFORE parameterized routes
+// to prevent /:id from matching "all", "city", etc.
 
-// /api/restaurant/64f2ab.../menu
-router.get("/:id/menu", getMenuByRestaurant);
-
-router.get("/details/:id", getRestaurantDetails);
-
+// /api/restaurant/all
 router.get("/all", async (req, res) => {
   try {
     const page = Math.max(parseInt(req.query.page ?? "1", 10), 1);
@@ -26,12 +22,7 @@ router.get("/all", async (req, res) => {
       return res.json({
         success: true,
         restaurants,
-        meta: {
-          page,
-          limit,
-          total,
-          hasNextPage: skip + restaurants.length < total,
-        },
+        meta: { page, limit, total, hasNextPage: skip + restaurants.length < total },
       });
     }
 
@@ -43,5 +34,13 @@ router.get("/all", async (req, res) => {
   }
 });
 
+// /api/restaurant/city/Delhi
+router.get("/city/:city", getRestaurantsByCity);
+
+// /api/restaurant/details/:id
+router.get("/details/:id", getRestaurantDetails);
+
+// /api/restaurant/:id/menu
+router.get("/:id/menu", getMenuByRestaurant);
 
 export default router;
